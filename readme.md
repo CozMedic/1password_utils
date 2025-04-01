@@ -26,9 +26,10 @@ Select an account:
 2. ('another.domain.com', 'another-email@another-domain.com', 'ANOTHER_LONG_ID')
 Enter the number of the option: 1
 Select a vault:
-1. Private
-2. 1Password
-3. Shared
+1. All Vaults
+2. Private
+3. 1Password
+4. Shared
 Enter the number of the option: 1
 2 duplicates were found:
   Name of item: 2 duplicates

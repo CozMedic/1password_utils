@@ -35,8 +35,27 @@ def list_items_in_vault(account_user_id, vault_name):
     return json.loads(result.stdout)
 
 
-def find_duplicates(account, vault_name):
-    items = list_items_in_vault(account, vault_name)
+def list_all_items(account_user_id, vaults):
+    all_items = []
+    for vault in vaults:
+        vault_name = vault["name"]
+        items = list_items_in_vault(account_user_id, vault_name)
+        # Add vault name to each item for reference
+        for item in items:
+            item["vault_name"] = vault_name
+        all_items.extend(items)
+    return all_items
+
+
+def find_duplicates(account, vault_name, vaults=None):
+    if vault_name == "All Vaults":
+        items = list_all_items(account, vaults)
+    else:
+        items = list_items_in_vault(account, vault_name)
+        # Add vault name to each item for reference
+        for item in items:
+            item["vault_name"] = vault_name
+    
     item_dict = defaultdict(list)
 
     for item in items:
@@ -74,23 +93,25 @@ def select_option(options, prompt):
 )
 def main(vault_name, dry):
     doc_string = """
-    This program finds and archives duplicates in a given vault.
+    This program finds and archives duplicates in a given vault or across all vaults.
     Use --dry to print the commands that would be run without executing them.
     Use --help for more information.
     """
     print("\n" + doc_string)
+    
+    accounts = list_accounts()
+    account_options = [(a["url"], a["email"], a["user_uuid"]) for a in accounts]
+    account_url, account_email, account_user_id = select_option(
+        account_options, "Select an account:"
+    )
+
+    vaults = list_vaults(account_user_id)
+    
     if not vault_name:
-        accounts = list_accounts()
-        account_options = [(a["url"], a["email"], a["user_uuid"]) for a in accounts]
-        account_url, account_email, account_user_id = select_option(
-            account_options, "Select an account:"
-        )
-
-        vaults = list_vaults(account_user_id)
-        vault_options = [v["name"] for v in vaults]
-        vault_name = select_option(vault_options, "Select a vault:")
-
-    duplicates = find_duplicates(account_user_id, vault_name)
+        vault_options = ["All Vaults"] + [v["name"] for v in vaults]
+        vault_name = select_option(vault_options, "Select a vault (or 'All Vaults' to search across all vaults):")
+    
+    duplicates = find_duplicates(account_user_id, vault_name, vaults if vault_name == "All Vaults" else None)
 
     if duplicates:
         print(f"{len(duplicates)} duplicates were found:")
@@ -110,13 +131,14 @@ def main(vault_name, dry):
             for key, items in duplicates.items():
                 items_to_archive = items[1:]  # Keep one, archive the rest
                 for item in items_to_archive:
+                    item_vault = item.get("vault_name", vault_name)
                     cmd = [
                         "op",
                         "item",
                         "delete",
                         item.get("id"),
                         "--vault",
-                        vault_name,
+                        item_vault,
                         "--archive",
                     ]
                     if dry:
